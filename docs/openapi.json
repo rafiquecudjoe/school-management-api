@@ -1,0 +1,1151 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Axion School Management API",
+    "version": "1.0.0",
+    "description": "School Management System API built on Axion template routing. Provides CRUD operations for Schools, Classrooms and Students with RBAC (SUPERADMIN / SCHOOL_ADMIN)."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5112",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "Auth" },
+    { "name": "School" },
+    { "name": "Classroom" },
+    { "name": "Student" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "TokenHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "token",
+        "description": "Long JWT token returned by v1_login"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "abc123" },
+          "email": { "type": "string", "format": "email" },
+          "fullName": { "type": "string" },
+          "role": { "type": "string", "enum": ["SUPERADMIN", "SCHOOL_ADMIN"] },
+          "schoolId": { "type": "string", "nullable": true },
+          "isActive": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "School": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "code": { "type": "string" },
+          "address": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "isActive": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Classroom": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "schoolId": { "type": "string" },
+          "name": { "type": "string" },
+          "gradeLevel": { "type": "string" },
+          "capacity": { "type": "integer" },
+          "resources": { "type": "array", "items": { "type": "string" } },
+          "isActive": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Student": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "schoolId": { "type": "string" },
+          "classroomId": { "type": "string", "nullable": true },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "dob": { "type": "string", "format": "date" },
+          "studentNumber": { "type": "string" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StudentTransfer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "studentId": { "type": "string" },
+          "fromSchoolId": { "type": "string" },
+          "toSchoolId": { "type": "string" },
+          "reason": { "type": "string" },
+          "transferredBy": { "type": "string" },
+          "transferredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "skip": { "type": "integer" }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "path": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "SuccessEnvelope": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "data": { "type": "object" },
+          "errors": { "type": "array", "items": {} },
+          "message": { "type": "string" }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": false },
+          "data": { "type": "object" },
+          "errors": {
+            "oneOf": [
+              { "type": "array", "items": { "$ref": "#/components/schemas/ValidationError" } },
+              { "type": "string" }
+            ]
+          },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/v1_register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register user",
+        "description": "First SUPERADMIN can bootstrap without token. Creating additional SUPERADMIN users requires a SUPERADMIN token in the `token` header.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password", "fullName"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "example": "Pass@1234" },
+                  "fullName": { "type": "string" },
+                  "role": { "type": "string", "enum": ["SUPERADMIN", "SCHOOL_ADMIN"] },
+                  "schoolId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": { "$ref": "#/components/schemas/User" },
+                        "longToken": { "type": "string" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or business error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/v1_login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and get long token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": { "$ref": "#/components/schemas/User" },
+                        "longToken": { "type": "string" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/token/v1_createShortToken": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Create short token from long token",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short token created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "shortToken": { "type": "string" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/school/v1_createSchool": {
+      "post": {
+        "tags": ["School"],
+        "summary": "Create school (SUPERADMIN)",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "code"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "code": { "type": "string" },
+                  "address": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string", "format": "email" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "school": { "$ref": "#/components/schemas/School" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          },
+          "403": {
+            "description": "SUPERADMIN role required",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          },
+          "409": {
+            "description": "School code already exists",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          }
+        }
+      }
+    },
+    "/api/school/v1_getSchool": {
+      "post": {
+        "tags": ["School"],
+        "summary": "Get school by ID",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId"],
+                "properties": {
+                  "schoolId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "school": { "$ref": "#/components/schemas/School" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          },
+          "404": {
+            "description": "School not found",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          }
+        }
+      }
+    },
+    "/api/school/v1_listSchools": {
+      "post": {
+        "tags": ["School"],
+        "summary": "List schools with pagination",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "q": { "type": "string", "description": "Search query" },
+                  "limit": { "type": "integer", "default": 10 },
+                  "skip": { "type": "integer", "default": 0 },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Schools listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/School" }
+                        },
+                        "page": { "$ref": "#/components/schemas/Page" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+          }
+        }
+      }
+    },
+    "/api/school/v1_updateSchool": {
+      "post": {
+        "tags": ["School"],
+        "summary": "Update school (SUPERADMIN)",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "name": { "type": "string" },
+                  "code": { "type": "string" },
+                  "address": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "school": { "$ref": "#/components/schemas/School" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "School not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/school/v1_deleteSchool": {
+      "post": {
+        "tags": ["School"],
+        "summary": "Delete school (SUPERADMIN)",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId"],
+                "properties": {
+                  "schoolId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "school": { "$ref": "#/components/schemas/School" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "Cannot delete — linked classrooms exist", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/classroom/v1_createClassroom": {
+      "post": {
+        "tags": ["Classroom"],
+        "summary": "Create classroom (SCHOOL_ADMIN + school scope)",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "name", "gradeLevel", "capacity"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "name": { "type": "string" },
+                  "gradeLevel": { "type": "string" },
+                  "capacity": { "type": "integer", "minimum": 1 },
+                  "resources": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classroom created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "classroom": { "$ref": "#/components/schemas/Classroom" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "Classroom name already exists in school", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/classroom/v1_getClassroom": {
+      "post": {
+        "tags": ["Classroom"],
+        "summary": "Get classroom by ID",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "classroomId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "classroomId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classroom found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "classroom": { "$ref": "#/components/schemas/Classroom" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Classroom not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/classroom/v1_listClassrooms": {
+      "post": {
+        "tags": ["Classroom"],
+        "summary": "List classrooms with pagination",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schoolId": { "type": "string", "description": "Required for SCHOOL_ADMIN, optional for SUPERADMIN" },
+                  "q": { "type": "string" },
+                  "limit": { "type": "integer", "minimum": 1, "default": 10 },
+                  "skip": { "type": "integer", "minimum": 0, "default": 0 },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classrooms listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Classroom" }
+                        },
+                        "page": { "$ref": "#/components/schemas/Page" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/classroom/v1_updateClassroom": {
+      "post": {
+        "tags": ["Classroom"],
+        "summary": "Update classroom",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "classroomId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "classroomId": { "type": "string" },
+                  "name": { "type": "string" },
+                  "gradeLevel": { "type": "string" },
+                  "capacity": { "type": "integer", "minimum": 1 },
+                  "resources": { "type": "array", "items": { "type": "string" } },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classroom updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "classroom": { "$ref": "#/components/schemas/Classroom" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Classroom not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/classroom/v1_deleteClassroom": {
+      "post": {
+        "tags": ["Classroom"],
+        "summary": "Delete classroom",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "classroomId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "classroomId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classroom deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "classroom": { "$ref": "#/components/schemas/Classroom" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "Cannot delete — enrolled students exist", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_createStudent": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Create student",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "firstName", "lastName", "dob", "studentNumber"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "classroomId": { "type": "string" },
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" },
+                  "dob": { "type": "string", "example": "2010-04-15" },
+                  "studentNumber": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "student": { "$ref": "#/components/schemas/Student" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "Classroom at capacity or duplicate student number", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_getStudent": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Get student by ID",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "studentId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "studentId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "student": { "$ref": "#/components/schemas/Student" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Student not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_listStudents": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "List students with pagination and filters",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schoolId": { "type": "string", "description": "Required for SCHOOL_ADMIN, optional for SUPERADMIN" },
+                  "q": { "type": "string" },
+                  "limit": { "type": "integer", "minimum": 1, "default": 10 },
+                  "skip": { "type": "integer", "minimum": 0, "default": 0 },
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+                  "classroomId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Students listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Student" }
+                        },
+                        "page": { "$ref": "#/components/schemas/Page" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_updateStudent": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Update student",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "studentId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "studentId": { "type": "string" },
+                  "classroomId": { "type": "string" },
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" },
+                  "dob": { "type": "string", "example": "2010-04-15" },
+                  "studentNumber": { "type": "string" },
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "student": { "$ref": "#/components/schemas/Student" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Student not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_deleteStudent": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Soft-delete student (sets deletedAt + status INACTIVE)",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "studentId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "studentId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student deleted (soft)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "student": { "$ref": "#/components/schemas/Student" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Student not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    },
+    "/api/student/v1_transferStudent": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Transfer student to another classroom",
+        "security": [{ "TokenHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["schoolId", "studentId", "toClassroomId"],
+                "properties": {
+                  "schoolId": { "type": "string" },
+                  "studentId": { "type": "string" },
+                  "toClassroomId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student transferred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "student": { "$ref": "#/components/schemas/Student" },
+                        "transfer": { "$ref": "#/components/schemas/StudentTransfer" }
+                      }
+                    },
+                    "errors": { "type": "array", "items": {} },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "404": { "description": "Student or classroom not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+          "409": { "description": "Target classroom at capacity", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+        }
+      }
+    }
+  }
+}
