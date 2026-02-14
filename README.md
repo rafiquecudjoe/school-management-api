@@ -234,41 +234,56 @@ npm run test:fresh    # clean DB + run all tests
 npm run test:cleanup  # wipe test data from MongoDB
 ```
 
-### Test Results (31 / 31 passing)
+### Test Results (46 / 46 passing)
 
 ```
-✔ v1_register creates a SUPERADMIN user (289ms)
-✔ v1_login returns longToken for registered user (83ms)
-✔ v1_createShortToken returns shortToken from a valid longToken (44ms)
-✔ v1_register returns clear validation error for invalid role (3ms)
-✔ v1_login returns invalid credentials for wrong password (78ms)
-✔ protected endpoint returns 401 without token (2ms)
-✔ protected endpoint returns 401 with invalid token (5ms)
-✔ v1_register blocks additional SUPERADMIN creation without token (83ms)
-✔ v1_register allows additional SUPERADMIN creation with SUPERADMIN token (159ms)
-✔ v1_register rejects SCHOOL_ADMIN with unknown schoolId (81ms)
-✔ v1_register allows SCHOOL_ADMIN with valid schoolId (157ms)
-✔ classroom v1 CRUD works for SCHOOL_ADMIN (312ms)
-✔ classroom create fails validation for missing required fields (222ms)
-✔ classroom create rejects duplicate name within same school (234ms)
-✔ classroom get/update/delete return not found for unknown id (229ms)
-✔ classroom CRUD works for SUPERADMIN (full system access) (78ms)
-✔ classroom school scope denies SCHOOL_ADMIN for other school (229ms)
-✔ school v1 CRUD endpoints work for SUPERADMIN (150ms)
-✔ school create returns validation errors for bad payload (77ms)
-✔ school RBAC denies SCHOOL_ADMIN for school endpoints (319ms)
-✔ school get/update/delete return not found for unknown id (93ms)
-✔ school delete is blocked when linked entities exist (241ms)
-✔ student v1 CRUD and transfer work for SCHOOL_ADMIN (324ms)
-✔ student create fails validation for missing required fields (287ms)
-✔ student create rejects invalid dob format (307ms)
-✔ student create rejects duplicate studentNumber in same school (278ms)
-✔ student get/update/delete return not found for unknown id (257ms)
-✔ student CRUD works for SUPERADMIN (full system access) (97ms)
-✔ student school scope denies SCHOOL_ADMIN for other school (247ms)
-✔ student transfer fails when student is not found (248ms)
-✔ student transfer fails when target classroom is outside school (410ms)
-ℹ tests 31 | pass 31 | fail 0 | duration ~5.8s
+✔ v1_register creates a SUPERADMIN user
+✔ v1_login returns longToken for registered user
+✔ v1_createShortToken returns shortToken from a valid longToken
+✔ v1_register returns clear validation error for invalid role
+✔ v1_login returns invalid credentials for wrong password
+✔ protected endpoint returns 401 without token
+✔ protected endpoint returns 401 with invalid token
+✔ v1_register blocks additional SUPERADMIN creation without token
+✔ v1_register allows additional SUPERADMIN creation with SUPERADMIN token
+✔ v1_register rejects SCHOOL_ADMIN with unknown schoolId
+✔ v1_register allows SCHOOL_ADMIN with valid schoolId
+✔ classroom v1 CRUD works for SCHOOL_ADMIN
+✔ classroom create fails validation for missing required fields
+✔ classroom create rejects duplicate name within same school
+✔ classroom get/update/delete return not found for unknown id
+✔ classroom CRUD works for SUPERADMIN (full system access)
+✔ classroom school scope denies SCHOOL_ADMIN for other school
+✔ auth - wrong password returns error
+✔ auth - missing token returns 401
+✔ auth - invalid token format returns 401
+✔ RBAC - SCHOOL_ADMIN cannot create school
+✔ RBAC - SCHOOL_ADMIN cannot delete school
+✔ RBAC - SCHOOL_ADMIN cannot access other school data
+✔ validation - empty school name rejected
+✔ validation - missing required field rejected
+✔ validation - invalid email format rejected
+✔ business rule - duplicate school code rejected
+✔ business rule - cannot delete school with classrooms
+✔ business rule - classroom at capacity rejects enrollment
+✔ business rule - get non-existent student returns 404
+✔ edge case - list with skip beyond total returns empty
+✔ edge case - list limit capped at 100
+✔ school v1 CRUD endpoints work for SUPERADMIN
+✔ school create returns validation errors for bad payload
+✔ school RBAC denies SCHOOL_ADMIN for school endpoints
+✔ school get/update/delete return not found for unknown id
+✔ school delete is blocked when linked entities exist
+✔ student v1 CRUD and transfer work for SCHOOL_ADMIN
+✔ student create fails validation for missing required fields
+✔ student create rejects invalid dob format
+✔ student create rejects duplicate studentNumber in same school
+✔ student get/update/delete return not found for unknown id
+✔ student CRUD works for SUPERADMIN (full system access)
+✔ student school scope denies SCHOOL_ADMIN for other school
+✔ student transfer fails when student is not found
+✔ student transfer fails when target classroom is outside school
+ℹ tests 46 | pass 46 | fail 0 | duration ~10.5s
 ```
 
 ### Coverage by Suite
@@ -279,6 +294,7 @@ npm run test:cleanup  # wipe test data from MongoDB
 | `classroom.v1.test.js` | 6 | CRUD, validation, duplicates, SUPERADMIN access, school scope |
 | `school.v1.test.js` | 5 | CRUD, validation, RBAC, not-found, delete guards |
 | `student.v1.test.js` | 9 | CRUD, validation, DOB format, duplicates, SUPERADMIN access, scope, transfer |
+| `integration.v1.test.js` | 15 | Auth edge cases, RBAC enforcement, validation rules, business rules, edge cases |
 
 ### Test Utilities
 
@@ -287,15 +303,47 @@ npm run test:cleanup  # wipe test data from MongoDB
 
 ## Deployment Instructions
 
-Recommended quick path (Render/Railway/Fly):
+### Deploy on Render (Recommended)
 
-1. Push code to a public Git repository.
-2. Create a new Node.js web service from the repo.
-3. Set start command: `node index.js`
-4. Add all required environment variables.
-5. Provision MongoDB + Redis services (or use managed providers).
-6. Update `MONGO_URI` and Redis URLs in environment.
-7. Deploy and verify with Postman collection.
+1. Push code to a public GitHub repository.
+
+2. **MongoDB** — Create a free cluster on [MongoDB Atlas](https://cloud.mongodb.com):
+   - Create cluster → Get connection string → Set as `MONGO_URI`
+
+3. **Redis** — Create a Redis instance on [Render](https://render.com) or [Upstash](https://upstash.com):
+   - Get connection URL → Set as `REDIS_URI`, `CORTEX_REDIS`, `OYSTER_REDIS`, `CACHE_REDIS`
+
+4. **Web Service** — Create a new Web Service on Render:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment**: Node
+   - Add all required env vars (see Environment Variables section)
+
+5. **Environment Variables** to set on Render:
+   ```
+   MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/axion
+   REDIS_URI=redis://<your-redis-url>
+   CORTEX_REDIS=redis://<your-redis-url>
+   OYSTER_REDIS=redis://<your-redis-url>
+   CACHE_REDIS=redis://<your-redis-url>
+   LONG_TOKEN_SECRET=<random-32-char-string>
+   SHORT_TOKEN_SECRET=<random-32-char-string>
+   NACL_SECRET=<random-32-char-string>
+   USER_PORT=5112
+   ENV=production
+   CORS_ORIGIN=*
+   ```
+
+6. Deploy and verify:
+   - Health check: `GET https://<your-app>.onrender.com/health`
+   - Swagger docs: `GET https://<your-app>.onrender.com/docs`
+
+### Docker (Local Development)
+
+```bash
+docker compose up -d    # starts API + MongoDB + Redis
+docker compose down      # stop all services
+```
 
 ## Submission Checklist
 

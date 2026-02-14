@@ -4,6 +4,7 @@
   "description": "Boilerplate",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "node tests/_helpers/cleanup.js && RATE_LIMIT_MAX=100000 node --test --test-timeout=15000 --test-concurrency=1 tests/*.test.js ; node tests/_helpers/cleanup.js",
     "test:cleanup": "node tests/_helpers/cleanup.js",
     "test:fresh": "npm run test:cleanup && npm test",
