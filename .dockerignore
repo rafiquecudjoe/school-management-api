@@ -1,0 +1,9 @@
+node_modules
+.git
+.env
+.env.example
+tests
+dump.rdb
+are-axions.jpeg
+*.md
+.prettierignore
