@@ -4,7 +4,11 @@
   "description": "Boilerplate",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/_helpers/cleanup.js && RATE_LIMIT_MAX=100000 node --test --test-timeout=15000 --test-concurrency=1 tests/*.test.js ; node tests/_helpers/cleanup.js",
+    "test:cleanup": "node tests/_helpers/cleanup.js",
+    "test:fresh": "npm run test:cleanup && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "author": "",
   "license": "ISC",
@@ -15,14 +19,21 @@
     "debug": "^4.3.4",
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
-    "oyster-db": "*",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "ion-cortex": "^1.3.6",
     "jsonwebtoken": "^8.5.1",
     "lodash": "^4.17.21",
     "md5": "^2.3.0",
+    "mongoose": "^9.2.1",
     "nanoid": "^3.3.2",
+    "oyster-db": "*",
     "qantra-pineapple": "^1.0.7",
     "request-ip": "^2.1.3",
+    "swagger-ui-express": "^5.0.1",
     "useragent": "^2.3.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1"
   }
 }
