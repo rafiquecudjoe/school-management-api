@@ -58,6 +58,7 @@ typings/
 
 # dotenv environment variables file
 .env
+.env.local
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -91,4 +92,3 @@ sw.*
 
 # vscode
 .vscode/
-
